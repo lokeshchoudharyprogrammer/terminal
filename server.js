@@ -191,7 +191,14 @@ nextApp.prepare().then(() => {
           cols: 120,
           rows: 36,
           cwd: process.env.HOME || process.cwd(),
-          env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', AGY_SERVER: resolvedAgyServer },
+          env: {
+            ...process.env,
+            TERM: 'xterm-256color',
+            COLORTERM: 'truecolor',
+            AGY_SCRIPTS_DIR: SCRIPTS_DIR,
+            PATH: `${SCRIPTS_DIR}:${process.env.PATH}`,
+            AGY_SERVER: resolvedAgyServer,
+          },
         });
 
         activeProcess.onData((data) => {
