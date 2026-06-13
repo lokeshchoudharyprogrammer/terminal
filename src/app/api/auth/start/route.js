@@ -32,17 +32,8 @@ export async function GET(request) {
 
   global.pendingSessions.set(state, { verifier, challenge, nonce, createdAt: Date.now() });
 
-  let origin = 'http://localhost:3000';
-  const forwardedHost = request.headers.get('x-forwarded-host');
-  if (forwardedHost) {
-    const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
-    origin = `${forwardedProto}://${forwardedHost}`;
-  } else {
-    try {
-      const urlObj = new URL(request.url);
-      origin = urlObj.origin;
-    } catch {}
-  }
+  const PORT = process.env.PORT || 3000;
+  let origin = `http://localhost:${PORT}`;
 
   const CLIENT_ID   = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
   const REDIRECT    = `${origin}/api/auth/callback`;
