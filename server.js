@@ -66,13 +66,17 @@ nextApp.prepare().then(() => {
     console.log(`[WS] Client connected. mode=${mode}`);
 
     if (mode === 'auth') {
-      handleAuthTerminal(ws);
+      handleAuthTerminal(ws, req);
     } else {
-      handleChatTerminal(ws);
+      handleChatTerminal(ws, req);
     }
   });
 
-  function handleAuthTerminal(ws) {
+  function handleAuthTerminal(ws, req) {
+    const query = url.parse(req.url, true).query;
+    const clientOrigin = query.origin || '';
+    const resolvedAgyServer = clientOrigin || `http://localhost:${PORT}`;
+
     const shell = getShell();
     const useZsh = shell.includes('zsh');
 
@@ -81,7 +85,7 @@ nextApp.prepare().then(() => {
     let outputBuffer = '';
 
     const spawnShell = (cols, rows) => {
-      console.log(`[AUTH-PTY] Spawning real shell: ${shell}`);
+      console.log(`[AUTH-PTY] Spawning real shell: ${shell} for origin: ${resolvedAgyServer}`);
       const spawnArgs = useZsh ? ['-i'] : ['-i'];
 
       term = pty.spawn(shell, spawnArgs, {
@@ -97,7 +101,7 @@ nextApp.prepare().then(() => {
           AGY_SCRIPTS_DIR: SCRIPTS_DIR,
           PATH: `${SCRIPTS_DIR}:${process.env.PATH}`,
           SHELL_SESSIONS_DISABLE: '1',
-          AGY_SERVER: `http://localhost:${PORT}`,
+          AGY_SERVER: resolvedAgyServer,
         },
       });
 
@@ -165,9 +169,13 @@ nextApp.prepare().then(() => {
     });
   }
 
-  function handleChatTerminal(ws) {
+  function handleChatTerminal(ws, req) {
     console.log('[CHAT-WS] Client connected to chat bridge.');
     let activeProcess = null;
+
+    const query = url.parse(req.url, true).query;
+    const clientOrigin = query.origin || '';
+    const resolvedAgyServer = clientOrigin || `http://localhost:${PORT}`;
 
     const spawnCommand = (fullCommand) => {
       if (activeProcess) {
@@ -183,7 +191,7 @@ nextApp.prepare().then(() => {
           cols: 120,
           rows: 36,
           cwd: process.env.HOME || process.cwd(),
-          env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', AGY_SERVER: `http://localhost:${PORT}` },
+          env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', AGY_SERVER: resolvedAgyServer },
         });
 
         activeProcess.onData((data) => {

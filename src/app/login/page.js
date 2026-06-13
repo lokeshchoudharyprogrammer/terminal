@@ -50,6 +50,8 @@ export default function LoginPage() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       wsUrl = `${protocol}//${window.location.host}/api/pty?mode=auth`;
     }
+    const originSep = wsUrl.includes('?') ? '&' : '?';
+    wsUrl = `${wsUrl}${originSep}origin=${encodeURIComponent(window.location.origin)}`;
     console.log('[PTY] Connecting to:', wsUrl);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

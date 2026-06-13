@@ -24,7 +24,7 @@ function generateState() {
   return crypto.randomBytes(16).toString('base64url');
 }
 
-export async function GET() {
+export async function GET(request) {
   const verifier   = generateCodeVerifier();
   const challenge  = generateCodeChallenge(verifier);
   const state      = generateState();
@@ -32,9 +32,20 @@ export async function GET() {
 
   global.pendingSessions.set(state, { verifier, challenge, nonce, createdAt: Date.now() });
 
-  const PORT = process.env.PORT || 3000;
+  let origin = 'http://localhost:3000';
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  if (forwardedHost) {
+    const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
+    origin = `${forwardedProto}://${forwardedHost}`;
+  } else {
+    try {
+      const urlObj = new URL(request.url);
+      origin = urlObj.origin;
+    } catch {}
+  }
+
   const CLIENT_ID   = '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
-  const REDIRECT    = `http://localhost:${PORT}/api/auth/callback`;
+  const REDIRECT    = `${origin}/api/auth/callback`;
   const SCOPES      = [
     'openid',
     'email',

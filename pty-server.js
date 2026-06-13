@@ -180,16 +180,17 @@ wss.on('connection', (ws, req) => {
   console.log(`[WS] Client connected. mode=${mode}`);
 
   if (mode === 'auth') {
-    // ── AUTH TERMINAL MODE ─────────────────────────────────────────
-    // Spawn a real interactive shell with our scripts in PATH
-    handleAuthTerminal(ws);
+    handleAuthTerminal(ws, req);
   } else {
-    // ── CHAT / COMMAND MODE (existing behavior) ────────────────────
-    handleChatTerminal(ws);
+    handleChatTerminal(ws, req);
   }
 });
 
-function handleAuthTerminal(ws) {
+function handleAuthTerminal(ws, req) {
+  const query = url.parse(req.url, true).query;
+  const clientOrigin = query.origin || '';
+  const resolvedAgyServer = clientOrigin || `http://localhost:${PORT}`;
+
   const shell = getShell();
   const useZsh = shell.includes('zsh');
 
@@ -198,8 +199,7 @@ function handleAuthTerminal(ws) {
   let outputBuffer = '';
 
   const spawnShell = (cols, rows) => {
-    console.log(`[AUTH-PTY] Spawning real shell: ${shell}`);
-
+    console.log(`[AUTH-PTY] Spawning real shell: ${shell} for origin: ${resolvedAgyServer}`);
     const spawnArgs = useZsh ? ['-i'] : ['-i'];
 
     term = pty.spawn(shell, spawnArgs, {
@@ -215,7 +215,7 @@ function handleAuthTerminal(ws) {
         AGY_SCRIPTS_DIR: SCRIPTS_DIR,
         PATH: `${SCRIPTS_DIR}:${process.env.PATH}`,
         SHELL_SESSIONS_DISABLE: '1',
-        AGY_SERVER: `http://localhost:${PORT}`,
+        AGY_SERVER: resolvedAgyServer,
       },
     });
 
@@ -290,9 +290,13 @@ function handleAuthTerminal(ws) {
 }
 
 // ── CHAT TERMINAL: existing run/input command mode ─────────────────────────
-function handleChatTerminal(ws) {
+function handleChatTerminal(ws, req) {
   console.log('[CHAT-WS] Client connected to chat bridge.');
   let activeProcess = null;
+
+  const query = url.parse(req.url, true).query;
+  const clientOrigin = query.origin || '';
+  const resolvedAgyServer = clientOrigin || `http://localhost:${PORT}`;
 
   const spawnCommand = (fullCommand) => {
     if (activeProcess) {
@@ -308,7 +312,7 @@ function handleChatTerminal(ws) {
         cols: 120,
         rows: 36,
         cwd: process.env.HOME || process.cwd(),
-        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', AGY_SERVER: `http://localhost:${PORT}` },
+        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', AGY_SERVER: resolvedAgyServer },
       });
 
       activeProcess.onData((data) => {

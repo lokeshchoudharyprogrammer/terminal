@@ -449,6 +449,8 @@ export default function ChatPage() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       wsUrl = `${protocol}//${window.location.host}/api/pty?mode=chat`;
     }
+    const originSep = wsUrl.includes('?') ? '&' : '?';
+    wsUrl = `${wsUrl}${originSep}origin=${encodeURIComponent(window.location.origin)}`;
     console.log('[PTY Chat] Connecting to:', wsUrl);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
