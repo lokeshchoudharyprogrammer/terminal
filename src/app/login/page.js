@@ -34,6 +34,39 @@ export default function LoginPage() {
   const wsRef    = useRef(null);
   const [status, setStatus] = useState('connecting');
 
+  // ── Auto login listener (BroadcastChannel & window.opener postMessage) ────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleCode = (code) => {
+      console.log('[AUTH] Automatically submitting auth code:', code);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'input', data: `${code}\n` }));
+      }
+    };
+
+    // 1. Same-origin communication
+    const channel = new BroadcastChannel('antigravity_auth');
+    channel.onmessage = (event) => {
+      if (event.data && event.data.type === 'code') {
+        handleCode(event.data.code);
+      }
+    };
+
+    // 2. Cross-origin popup/tab message listener
+    const handleMessage = (event) => {
+      if (event.data && event.data.type === 'antigravity_code') {
+        handleCode(event.data.code);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      channel.close();
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
+
   // ── Check if already authed ─────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;

@@ -19,13 +19,32 @@ export async function GET(request) {
     h2{color:#34d399;}</style></head>
     <body>
       <h2>✅ Authorization successful</h2>
-      <p style="color:#71717a">Copy the code below and paste it in the terminal:</p>
+      <p id="status-text" style="color:#71717a">Transferring code automatically to your terminal...</p>
       <div class="code" id="code">${code || 'NO_CODE_RETURNED'}</div>
       <button onclick="navigator.clipboard.writeText('${code}').then(()=>this.textContent='Copied!')"
         style="background:#6366f1;color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-family:monospace;font-weight:700">
         Copy Code
       </button>
       <p style="color:#52525b;font-size:11px">You can close this tab and return to your terminal.</p>
+
+      <script>
+        try {
+          // 1. Same-origin Broadcast
+          const channel = new BroadcastChannel('antigravity_auth');
+          channel.postMessage({ type: 'code', code: '${code}' });
+        } catch (e) {}
+
+        try {
+          // 2. Cross-origin Popup Message
+          if (window.opener) {
+            window.opener.postMessage({ type: 'antigravity_code', code: '${code}' }, '*');
+          }
+        } catch (e) {}
+
+        setTimeout(() => {
+          window.close();
+        }, 1200);
+      </script>
     </body></html>
   `;
 
