@@ -6,6 +6,20 @@ const crypto = require('crypto');
 const path = require('path');
 const url = require('url');
 const next = require('next');
+const fs = require('fs');
+
+function getShell() {
+  if (process.env.SHELL && fs.existsSync(process.env.SHELL)) {
+    return process.env.SHELL;
+  }
+  if (process.platform === 'darwin') {
+    if (fs.existsSync('/bin/zsh')) return '/bin/zsh';
+  }
+  if (fs.existsSync('/bin/bash')) return '/bin/bash';
+  if (fs.existsSync('/bin/sh')) return '/bin/sh';
+  return 'sh';
+}
+
 
 const dev = process.env.NODE_ENV !== 'production';
 const nextApp = next({ dev, dir: __dirname, webpack: true, turbopack: false });
@@ -59,8 +73,8 @@ nextApp.prepare().then(() => {
   });
 
   function handleAuthTerminal(ws) {
-    const shell = process.env.SHELL || '/bin/zsh';
-    const useZsh = shell.includes('zsh') || process.platform === 'darwin';
+    const shell = getShell();
+    const useZsh = shell.includes('zsh');
 
     let term = null;
     let authDone = false;
@@ -159,7 +173,7 @@ nextApp.prepare().then(() => {
         try { activeProcess.kill(); } catch {}
       }
 
-      const shell = process.env.SHELL || 'zsh';
+      const shell = getShell();
       console.log(`[CHAT-PTY] Spawning: ${shell} -c "${fullCommand}"`);
 
       try {

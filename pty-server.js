@@ -5,6 +5,20 @@ const pty = require('node-pty');
 const crypto = require('crypto');
 const path = require('path');
 const url = require('url');
+const fs = require('fs');
+
+function getShell() {
+  if (process.env.SHELL && fs.existsSync(process.env.SHELL)) {
+    return process.env.SHELL;
+  }
+  if (process.platform === 'darwin') {
+    if (fs.existsSync('/bin/zsh')) return '/bin/zsh';
+  }
+  if (fs.existsSync('/bin/bash')) return '/bin/bash';
+  if (fs.existsSync('/bin/sh')) return '/bin/sh';
+  return 'sh';
+}
+
 
 const PORT = process.env.PORT || 3001;
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
@@ -175,10 +189,9 @@ wss.on('connection', (ws, req) => {
   }
 });
 
-// ── AUTH TERMINAL: spawns a real interactive shell ─────────────────────────
 function handleAuthTerminal(ws) {
-  const shell = process.env.SHELL || '/bin/zsh';
-  const useZsh = shell.includes('zsh') || process.platform === 'darwin';
+  const shell = getShell();
+  const useZsh = shell.includes('zsh');
 
   let term = null;
   let authDone = false;
@@ -289,7 +302,7 @@ function handleChatTerminal(ws) {
       try { activeProcess.kill(); } catch {}
     }
 
-    const shell = process.env.SHELL || 'zsh';
+    const shell = getShell();
     console.log(`[CHAT-PTY] Spawning: ${shell} -c "${fullCommand}"`);
 
     try {
