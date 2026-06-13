@@ -75,7 +75,7 @@ nextApp.prepare().then(() => {
   function handleAuthTerminal(ws, req) {
     const query = url.parse(req.url, true).query;
     const clientOrigin = query.origin || '';
-    const resolvedAgyServer = process.env.RENDER_EXTERNAL_URL || clientOrigin || `http://localhost:${PORT}`;
+    const resolvedAgyServer = clientOrigin || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
     const shell = getShell();
     const useZsh = shell.includes('zsh');
@@ -175,7 +175,7 @@ nextApp.prepare().then(() => {
 
     const query = url.parse(req.url, true).query;
     const clientOrigin = query.origin || '';
-    const resolvedAgyServer = process.env.RENDER_EXTERNAL_URL || clientOrigin || `http://localhost:${PORT}`;
+    const resolvedAgyServer = clientOrigin || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
     const spawnCommand = (fullCommand) => {
       if (activeProcess) {

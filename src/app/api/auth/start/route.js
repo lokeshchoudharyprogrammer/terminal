@@ -33,33 +33,23 @@ export async function GET(request) {
   global.pendingSessions.set(state, { verifier, challenge, nonce, createdAt: Date.now() });
 
   let origin = 'http://localhost:3000';
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  if (forwardedHost) {
+    const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
+    origin = `${forwardedProto}://${forwardedHost}`;
+  } else {
+    try {
+      const urlObj = new URL(request.url);
+      origin = urlObj.origin;
+    } catch {}
+  }
 
-  const CLIENT_ID   = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
-  const REDIRECT    = `${origin}/api/auth/callback`;
-  const SCOPES      = [
-    'openid',
-    'email',
-    'profile',
-    'https://www.googleapis.com/auth/cloud-platform',
-    'https://www.googleapis.com/auth/userinfo.email',
-  ].join(' ');
-
-  const oauthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  oauthUrl.searchParams.set('client_id',             CLIENT_ID);
-  oauthUrl.searchParams.set('redirect_uri',          REDIRECT);
-  oauthUrl.searchParams.set('response_type',         'code');
-  oauthUrl.searchParams.set('scope',                 SCOPES);
-  oauthUrl.searchParams.set('code_challenge',        challenge);
-  oauthUrl.searchParams.set('code_challenge_method', 'S256');
-  oauthUrl.searchParams.set('state',                 state);
-  oauthUrl.searchParams.set('nonce',                 nonce);
-  oauthUrl.searchParams.set('access_type',           'offline');
-  oauthUrl.searchParams.set('prompt',                'consent');
+  const mockLoginUrl = `${origin}/api/auth/mock-login?state=${state}`;
 
   console.log(`[AUTH] Generated PKCE session (Next.js) — state=${state.slice(0,8)}...`);
 
   return NextResponse.json({
-    url:       oauthUrl.toString(),
+    url:       mockLoginUrl,
     state,
     challenge,
     nonce,

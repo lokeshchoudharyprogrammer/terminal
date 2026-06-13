@@ -189,7 +189,7 @@ wss.on('connection', (ws, req) => {
 function handleAuthTerminal(ws, req) {
   const query = url.parse(req.url, true).query;
   const clientOrigin = query.origin || '';
-  const resolvedAgyServer = process.env.RENDER_EXTERNAL_URL || clientOrigin || `http://localhost:${PORT}`;
+  const resolvedAgyServer = clientOrigin || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
   const shell = getShell();
   const useZsh = shell.includes('zsh');
@@ -296,7 +296,7 @@ function handleChatTerminal(ws, req) {
 
   const query = url.parse(req.url, true).query;
   const clientOrigin = query.origin || '';
-  const resolvedAgyServer = process.env.RENDER_EXTERNAL_URL || clientOrigin || `http://localhost:${PORT}`;
+  const resolvedAgyServer = clientOrigin || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
   const spawnCommand = (fullCommand) => {
     if (activeProcess) {
