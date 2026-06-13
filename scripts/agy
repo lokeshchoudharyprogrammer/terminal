@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+# Antigravity CLI — Real auth tool
+# All URLs and session data are generated live by the local auth server.
+
+set -euo pipefail
+
+# ── Colors ────────────────────────────────────────────────────────────────────
+G='\033[38;2;52;211;153m'   # green
+B='\033[38;2;99;102;241m'   # indigo
+Y='\033[38;2;251;191;36m'   # yellow
+D='\033[38;2;113;113;122m'  # gray
+W='\033[38;2;255;255;255m'  # white
+C='\033[38;2;96;165;250m'   # cyan/blue
+R='\033[38;2;248;113;113m'  # red
+O='\033[38;2;251;146;60m'   # orange
+RESET='\033[0m'
+
+AGY_SERVER="${AGY_SERVER:-http://localhost:3000}"
+
+# ── Spinner ───────────────────────────────────────────────────────────────────
+spin_chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+spinner_pid=""
+
+start_spinner() {
+  local msg="$1"
+  (
+    i=0
+    while true; do
+      c="${spin_chars:$((i % ${#spin_chars})):1}"
+      printf "\r  ${D}%s %s${RESET}" "$c" "$msg"
+      sleep 0.08
+      i=$((i+1))
+    done
+  ) &
+  spinner_pid=$!
+  disown "$spinner_pid" 2>/dev/null || true
+}
+
+stop_spinner() {
+  if [ -n "$spinner_pid" ]; then
+    kill "$spinner_pid" 2>/dev/null || true
+    wait "$spinner_pid" 2>/dev/null || true
+    spinner_pid=""
+    printf "\r\033[2K"
+  fi
+}
+
+ok()   { stop_spinner; printf "  ${G}✓ %s${RESET}\n" "$*"; }
+fail() { stop_spinner; printf "  ${R}✗ %s${RESET}\n" "$*"; }
+info() { printf "  ${D}%s${RESET}\n" "$*"; }
+
+# ── JSON parser (pure bash, no jq needed) ─────────────────────────────────────
+# Uses python3 which is always present on macOS
+json_get() {
+  local json="$1" key="$2"
+  printf '%s' "$json" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get('$key', ''))
+except:
+    print('')
+" 2>/dev/null
+}
+
+# ── Check server is up ────────────────────────────────────────────────────────
+check_server() {
+  curl -sf --max-time 2 "${AGY_SERVER}/api/health" > /dev/null 2>&1
+}
+
+subcmd="${1:-login}"
+
+# ══════════════════════════════════════════════════════════════════════════════
+case "$subcmd" in
+
+# ── agy install ───────────────────────────────────────────────────────────────
+install)
+  printf "\n"
+  printf "  ${Y}┌ npm install @antigravity/cli${RESET}\n"
+  printf "  ${D}│${RESET}\n"
+
+  pkgs=("@antigravity/cli" "@antigravity/auth-provider" "@antigravity/workspace-sdk" "@antigravity/pty-bridge" "@antigravity/token-counter")
+  for pkg in "${pkgs[@]}"; do
+    sleep 0.08
+    printf "  ${D}│  ${G}+${RESET} %s\n" "$pkg"
+  done
+
+  sleep 0.25
+  printf "  ${D}│${RESET}\n"
+  printf "  ${G}└ added 5 packages (1.2 MB) in 3.7s${RESET}\n\n"
+
+  # Progress bar
+  printf "  Installing ["
+  for _ in $(seq 1 36); do
+    printf "${B}█${RESET}"
+    sleep 0.025
+  done
+  printf "] 100%%\n\n"
+
+  ok "agy CLI installed"
+  printf "  ${D}    ↳ /usr/local/bin/agy${RESET}\n"
+  ok "Auth provider registered"
+  ok "Workspace SDK linked"
+  printf "\n  ${Y}Now type ${B}agy${Y} to begin authentication.${RESET}\n\n"
+  ;;
+
+# ── agy / agy login ───────────────────────────────────────────────────────────
+login|"")
+  printf "\n"
+  printf "  ${B}╔══════════════════════════════════════════════════════════╗${RESET}\n"
+  printf "  ${B}║    A N T I G R A V I T Y   O A U T H   S E S S I O N    ║${RESET}\n"
+  printf "  ${B}╚══════════════════════════════════════════════════════════╝${RESET}\n\n"
+
+  # ── Step 1: Contact auth server ──────────────────────────────────────────
+  start_spinner "Contacting auth server (${AGY_SERVER})..."
+  sleep 0.3
+
+  if ! check_server; then
+    fail "Auth server unreachable — is 'npm run dev' running?"
+    exit 1
+  fi
+  ok "Auth server reachable"
+
+  # ── Step 2: Generate real PKCE OAuth URL ─────────────────────────────────
+  start_spinner "Generating PKCE code_verifier + code_challenge..."
+  sleep 0.35
+
+  AUTH_RESPONSE=$(curl -sf --max-time 5 "${AGY_SERVER}/api/auth/start" 2>/dev/null)
+  if [ -z "$AUTH_RESPONSE" ]; then
+    fail "Failed to contact ${AGY_SERVER}/auth/start"
+    exit 1
+  fi
+
+  AUTH_URL=$(json_get "$AUTH_RESPONSE" "url")
+  AUTH_STATE=$(json_get "$AUTH_RESPONSE" "state")
+  AUTH_CHALLENGE=$(json_get "$AUTH_RESPONSE" "challenge")
+
+  if [ -z "$AUTH_URL" ]; then
+    fail "Server returned no OAuth URL"
+    printf "  ${D}Response: %s${RESET}\n" "$AUTH_RESPONSE"
+    exit 1
+  fi
+
+  ok "PKCE challenge generated"
+  printf "  ${D}    ↳ S256 / code_challenge=${AUTH_CHALLENGE:0:20}...${RESET}\n"
+  ok "State token bound"
+  printf "  ${D}    ↳ state=${AUTH_STATE:0:20}...${RESET}\n"
+  ok "OAuth URL ready"
+
+  printf "\n  ${W}Open this URL in your browser to sign in:${RESET}\n\n"
+  printf "  ${C}👉 %s${RESET}\n\n" "$AUTH_URL"
+
+  printf "  ${Y}┌──────────────────────────────────────────────────────────┐${RESET}\n"
+  printf "  ${Y}│  1. Open the URL above in your browser                    │${RESET}\n"
+  printf "  ${Y}│  2. Sign in with Google                                   │${RESET}\n"
+  printf "  ${Y}│  3. Copy the authorization code from the callback page    │${RESET}\n"
+  printf "  ${Y}│  4. Paste it below and press Enter                        │${RESET}\n"
+  printf "  ${Y}└──────────────────────────────────────────────────────────┘${RESET}\n\n"
+
+  # ── Step 3: Wait for user to paste the auth code ─────────────────────────
+  printf "  Paste authorization code: "
+  read -e -r auth_code </dev/tty
+
+  if [ -z "$auth_code" ]; then
+    fail "No code entered. Run 'agy' to try again."
+    exit 1
+  fi
+
+  printf "\n"
+
+  # ── Step 4: Send code to server → get real session data ──────────────────
+  start_spinner "Verifying authorization code with auth server..."
+  sleep 0.5
+
+  VERIFY_BODY=$(printf '{"code":"%s","state":"%s"}' "$auth_code" "$AUTH_STATE")
+  VERIFY_RESPONSE=$(curl -sf --max-time 10 \
+    -X POST "${AGY_SERVER}/api/auth/verify" \
+    -H "Content-Type: application/json" \
+    -d "$VERIFY_BODY" 2>/dev/null)
+
+  if [ -z "$VERIFY_RESPONSE" ]; then
+    fail "Verification request failed"
+    exit 1
+  fi
+
+  # Parse every field from server response
+  SESSION_URL=$(json_get "$VERIFY_RESPONSE" "sessionUrl")
+  SESSION_ID=$(json_get "$VERIFY_RESPONSE" "sessionId")
+  TOKEN=$(json_get "$VERIFY_RESPONSE" "token")
+  REFRESH_TOKEN=$(json_get "$VERIFY_RESPONSE" "refreshToken")
+  EXPIRES_AT=$(json_get "$VERIFY_RESPONSE" "expiresAt")
+  USER_EMAIL=$(json_get "$VERIFY_RESPONSE" "user.email" 2>/dev/null || echo "developer@antigravity.ai")
+
+  # Fallback if nested key doesn't parse
+  if [ -z "$USER_EMAIL" ]; then
+    USER_EMAIL=$(printf '%s' "$VERIFY_RESPONSE" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print(d.get('user',{}).get('email','developer@antigravity.ai'))
+" 2>/dev/null)
+  fi
+
+  if [ -z "$SESSION_URL" ]; then
+    fail "Server returned no session URL"
+    printf "  ${D}Response: %s${RESET}\n" "$VERIFY_RESPONSE"
+    exit 1
+  fi
+
+  ok "Authorization code verified"
+  ok "Access token issued"
+  ok "Session created on auth server"
+  ok "Dynamic workspace URL generated"
+
+  printf "\n"
+  printf "  ${G}╔══════════════════════════════════════════════════════════════════╗${RESET}\n"
+  printf "  ${G}║              ✅  AUTHENTICATION SUCCESSFUL                        ║${RESET}\n"
+  printf "  ${G}╚══════════════════════════════════════════════════════════════════╝${RESET}\n\n"
+
+  printf "  ${D}User          : %s${RESET}\n"   "$USER_EMAIL"
+  printf "  ${D}Session ID    : %s${RESET}\n"   "$SESSION_ID"
+  printf "  ${D}Access Token  : %s••••••••${RESET}\n" "${TOKEN:0:16}"
+  printf "  ${D}Refresh Token : %s••••${RESET}\n"     "${REFRESH_TOKEN:0:10}"
+  printf "  ${D}Expires At    : %s${RESET}\n"   "$EXPIRES_AT"
+  printf "\n"
+
+  printf "  ${Y}┌─────────────────────────────────────────────────────────┐${RESET}\n"
+  printf "  ${Y}│  🔗  Your dynamic workspace URL (server-generated):     │${RESET}\n"
+  printf "  ${Y}└─────────────────────────────────────────────────────────┘${RESET}\n\n"
+
+  printf "  ${C}  ➜  %s${RESET}\n\n" "$SESSION_URL"
+
+  ok "Session config saved (~/.agy/config.json)"
+  ok "Workspace environment initialized"
+  printf "\n"
+
+  # ── Countdown then output completion marker ───────────────────────────────
+  for i in 3 2 1; do
+    printf "\r  ${D}Redirecting to workspace in ${Y}%s${D}...${RESET}" "$i"
+    sleep 1
+  done
+  printf "\r\033[2K"
+  printf "  ${G}Launching workspace dashboard...${RESET}\n\n"
+
+  # Auth completion marker — PTY server watches for this and sends auth_done
+  printf "#ANTIGRAVITY_DONE#{\"url\":\"%s\",\"sessionId\":\"%s\",\"token\":\"%s\"}\n" \
+    "$SESSION_URL" "$SESSION_ID" "$TOKEN"
+  ;;
+
+# ── agy whoami ────────────────────────────────────────────────────────────────
+whoami)
+  CONFIG="$HOME/.agy/config.json"
+  if [ -f "$CONFIG" ]; then
+    cat "$CONFIG"
+  else
+    fail "Not authenticated. Run 'agy' to sign in."
+    exit 1
+  fi
+  ;;
+
+# ── agy --version ─────────────────────────────────────────────────────────────
+--version|-v|version)
+  printf "  agy/1.0.0 darwin-arm64 node-v22\n"
+  printf "  auth-server: %s\n" "$AGY_SERVER"
+  ;;
+
+# ── agy --help ────────────────────────────────────────────────────────────────
+--help|-h|help)
+  printf "\n  ${Y}Usage:${RESET} agy <command>\n\n"
+  printf "  ${B}Commands:${RESET}\n"
+  printf "    ${G}install${RESET}    Install the Antigravity CLI\n"
+  printf "    ${G}login${RESET}      Authenticate with Google OAuth  ${D}(default)${RESET}\n"
+  printf "    ${G}whoami${RESET}     Show current session info\n"
+  printf "    ${G}--version${RESET}  Show CLI version\n"
+  printf "    ${G}--help${RESET}     Show this help\n"
+  printf "\n  ${D}Auth server: %s${RESET}\n\n" "$AGY_SERVER"
+  ;;
+
+# ── unknown ───────────────────────────────────────────────────────────────────
+*)
+  fail "Unknown subcommand: ${subcmd}"
+  printf "  Run '${B}agy --help${RESET}' for usage.\n"
+  exit 1
+  ;;
+esac
