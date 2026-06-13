@@ -75,7 +75,7 @@ app.get('/auth/start', (req, res) => {
   pendingSessions.set(state, { verifier, challenge, nonce, createdAt: Date.now() });
 
   // Real Google OAuth 2.0 authorization URL with live PKCE params
-  const CLIENT_ID   = '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
+  const CLIENT_ID   = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
   const REDIRECT    = `http://localhost:${PORT}/auth/callback`;
   const SCOPES      = [
     'openid',
