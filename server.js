@@ -97,6 +97,7 @@ nextApp.prepare().then(() => {
           AGY_SCRIPTS_DIR: SCRIPTS_DIR,
           PATH: `${SCRIPTS_DIR}:${process.env.PATH}`,
           SHELL_SESSIONS_DISABLE: '1',
+          AGY_SERVER: `http://localhost:${PORT}`,
         },
       });
 
@@ -182,7 +183,7 @@ nextApp.prepare().then(() => {
           cols: 120,
           rows: 36,
           cwd: process.env.HOME || process.cwd(),
-          env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' },
+          env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', AGY_SERVER: `http://localhost:${PORT}` },
         });
 
         activeProcess.onData((data) => {

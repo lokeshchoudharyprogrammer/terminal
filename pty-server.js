@@ -211,14 +211,11 @@ function handleAuthTerminal(ws) {
         ...process.env,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
-        // Point zsh to our custom init dir
         ZDOTDIR: ZSH_INIT_DIR,
-        // Our scripts directory (read by .zshrc)
         AGY_SCRIPTS_DIR: SCRIPTS_DIR,
-        // Ensure our scripts are in PATH
         PATH: `${SCRIPTS_DIR}:${process.env.PATH}`,
-        // Suppress default zsh new user prompts
         SHELL_SESSIONS_DISABLE: '1',
+        AGY_SERVER: `http://localhost:${PORT}`,
       },
     });
 
@@ -311,7 +308,7 @@ function handleChatTerminal(ws) {
         cols: 120,
         rows: 36,
         cwd: process.env.HOME || process.cwd(),
-        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' },
+        env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', AGY_SERVER: `http://localhost:${PORT}` },
       });
 
       activeProcess.onData((data) => {
