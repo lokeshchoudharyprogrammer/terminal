@@ -281,30 +281,28 @@ whoami)
   shift 2
   if [ "${1:-}" = "--print" ]; then
     prompt="$2"
+    JSON_BODY=$(python3 -c "
+import json, sys
+print(json.dumps({'prompt': sys.argv[1], 'model': sys.argv[2]}))
+" "$prompt" "$model_name" 2>/dev/null || printf '{"prompt":"","model":""}')
+    RESPONSE=$(curl -sf -X POST "${AGY_SERVER}/api/generate" \
+      -H "Content-Type: application/json" \
+      -d "$JSON_BODY" 2>/dev/null || true)
+    if [ -n "$RESPONSE" ]; then
+      text=$(json_get "$RESPONSE" "text")
+      if [ -n "$text" ]; then
+        printf "%b\n" "$text"
+        exit 0
+      fi
+    fi
     printf "\n"
     printf "  ${B}🤖 Antigravity AI — ${model_name}${RESET}\n"
     printf "  ${D}─────────────────────────────────────────────────────────────────${RESET}\n"
-    lower_prompt=$(echo "$prompt" | tr '[:upper:]' '[:lower:]')
-    if [[ "$lower_prompt" == *"hello"* || "$lower_prompt" == *"hey"* || "$lower_prompt" == *"hi"* || "$lower_prompt" == *"google"* ]]; then
-      printf "  Hello! I am your Antigravity agentic assistant. I am running live on\n"
-      printf "  the Render backend container, ready to execute commands and help you\n"
-      printf "  manage your workspace.\n"
-    elif [[ "$lower_prompt" == *"help"* ]]; then
-      printf "  I can assist you with running commands, analyzing your codebase, or\n"
-      printf "  running files in this workspace. Try commands like:\n"
-      printf "    - ${G}ls -la${RESET}\n"
-      printf "    - ${G}agy whoami${RESET}\n"
-      printf "    - ${G}cat package.json${RESET}\n"
-    elif [[ "$lower_prompt" == *"model"* || "$lower_prompt" == *"models"* ]]; then
-      printf "  Active Model: ${G}${model_name}${RESET}\n"
-      printf "  I support Gemini 3.5 Flash, Gemini 3.1 Pro, and other models.\n"
-    else
-      printf "  Received your prompt: \"${prompt}\"\n\n"
-      printf "  As your agentic coding companion, I can help you build and manage\n"
-      printf "  files in your workspace. Try running system commands directly!\n"
-    fi
+    printf "  Received your prompt: \"${prompt}\"\n\n"
+    printf "  ${R}✗ Backend generation endpoint unreachable or returned empty.${RESET}\n"
+    printf "  Please check your backend connection and make sure your server is running.\n"
     printf "  ${D}─────────────────────────────────────────────────────────────────${RESET}\n\n"
-    exit 0
+    exit 1
   else
     fail "Invalid arguments. Usage: agy --model <model> --print <prompt>"
     exit 1
