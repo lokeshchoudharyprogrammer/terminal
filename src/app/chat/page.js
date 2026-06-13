@@ -442,6 +442,7 @@ export default function ChatPage() {
   useEffect(() => {
     let wsUrl = process.env.NEXT_PUBLIC_PTY_SERVER_URL;
     if (wsUrl) {
+      wsUrl = wsUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
       const separator = wsUrl.includes('?') ? '&' : '?';
       wsUrl = `${wsUrl}${separator}mode=chat`;
     } else {

@@ -43,6 +43,7 @@ export default function LoginPage() {
   const connectWS = useCallback((cols, rows) => {
     let wsUrl = process.env.NEXT_PUBLIC_PTY_SERVER_URL;
     if (wsUrl) {
+      wsUrl = wsUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
       const separator = wsUrl.includes('?') ? '&' : '?';
       wsUrl = `${wsUrl}${separator}mode=auth`;
     } else {
@@ -76,8 +77,8 @@ export default function LoginPage() {
     ws.onerror = () => {
       setStatus('error');
       termRef.current?.writeln(
-        '\r\n\x1b[38;2;248;113;113m  ✗ Cannot reach PTY server at localhost:3001.\x1b[0m\r\n' +
-        '\x1b[38;2;113;113;122m  Make sure you ran: npm run dev\x1b[0m\r\n'
+        `\r\n\x1b[38;2;248;113;113m  ✗ Cannot reach PTY server at ${wsUrl}.\x1b[0m\r\n` +
+        '\x1b[38;2;113;113;122m  Verify your NEXT_PUBLIC_PTY_SERVER_URL environment variable.\x1b[0m\r\n'
       );
     };
 
